@@ -21,9 +21,10 @@
                 </div>
 
                 <div class="login-inputs">
+                    <!-- CHANGED: Username to Email -->
                     <div class="input-container">
-                        <input type="text" id="username-input" placeholder=" " maxlength="20">
-                        <label for="username-input">Your username</label>
+                        <input type="email" id="login-email" placeholder=" " maxlength="50">
+                        <label for="login-email">Your email address</label>
                     </div>
 
                     <div class="input-container">
@@ -58,7 +59,7 @@
                         <label for="register-username">Choose a username</label>
                     </div>
 
-                    <!-- ADDED EMAIL FIELD -->
+                    <!-- ADDED: Email Field -->
                     <div class="input-container">
                         <input type="email" id="register-email" placeholder=" " maxlength="50">
                         <label for="register-email">Your email address</label>
@@ -68,8 +69,8 @@
                         <input type="password" id="register-password" placeholder=" " maxlength="30">
                         <label for="register-password">Choose a password</label>
                         <button type="button" class="password-toggle" id="register-password-toggle" title="Show password">
-                <span class="eye-icon">👁️</span>
-            </button>
+                            <span class="eye-icon">👁️</span>
+                        </button>
                         <div class="password-strength">
                             <div class="strength-bar" id="register-strength-bar"></div>
                         </div>
@@ -80,8 +81,8 @@
                         <input type="password" id="confirm-password" placeholder=" " maxlength="30">
                         <label for="confirm-password">Confirm password</label>
                         <button type="button" class="password-toggle" id="confirm-password-toggle" title="Show password">
-                <span class="eye-icon">👁️</span>
-            </button>
+                            <span class="eye-icon">👁️</span>
+                        </button>
                         <div class="password-match" id="password-match-indicator">
                             <span class="match-icon">✓</span>
                             <span class="match-text">Passwords match</span>
@@ -96,61 +97,65 @@
                 </div>
             </div>
 
-            <!-- Chat Section -->
-            <div class="chat-section" id="chatSection">
-                <div id="chat-header">
-                    <h2>💬 ChatMate Lets Talk</h2>
+            <div class="error-message" id="error-message"></div>
+            <div class="success-message" id="success-message"></div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-section" id="chatSection">
+            <div id="chat-header">
+                <h2>💬 ChatMate Lets Talk</h2>
+            </div>
+
+            <div id="chat-messages"></div>
+
+            <div id="input-section">
+                <button class="emoji-btn" id="emoji-btn">😊</button>
+                <input type="text" id="message-input" placeholder="Type your message here...">
+                <button class="btn" id="send-btn">Send</button>
+            </div>
+
+            <!-- Emoji Picker -->
+            <div id="emoji-picker" class="emoji-picker">
+                <div class="emoji-category">
+                    <span>Smileys</span>
+                    <div class="emoji-grid">
+                        <span>😀</span><span>😃</span><span>😄</span><span>😁</span>
+                        <span>😆</span><span>😅</span><span>😂</span><span>🤣</span>
+                        <span>😊</span><span>😇</span><span>🙂</span><span>🙃</span>
+                        <span>😉</span><span>☠️ </span><span>😍</span><span>🥰</span>
+                    </div>
                 </div>
-
-                <div id="chat-messages"></div>
-
-                <div id="input-section">
-                    <button class="emoji-btn" id="emoji-btn">😊</button>
-                    <input type="text" id="message-input" placeholder="Type your message here...">
-                    <button class="btn" id="send-btn">Send</button>
+                <div class="emoji-category">
+                    <span>Animals & Nature</span>
+                    <div class="emoji-grid">
+                        <span>🐵</span><span>🐒</span><span>🦍</span><span>🦧</span><span>🐶</span><span>🐕</span><span>🦮</span><span>🐩</span>
+                        <span>🐺</span><span>🦊</span><span>🦝</span><span>🐱</span><span>🐈</span><span>🦁</span><span>🐯</span><span>🐅</span>
+                        <span>🐆</span><span>🐴</span><span>🐎</span><span>🦄</span><span>🦓</span><span>🦌</span><span>🐮</span><span>🐂</span>
+                        <span>🐃</span><span>🐄</span><span>🐷</span><span>🐖</span><span>🐗</span><span>🐽</span><span>🐏</span><span>🐑</span>
+                        <span>🐐</span><span>🐪</span><span>🐫</span><span>🦙</span><span>🦒</span><span>🐘</span><span>🦏</span><span>🦛</span>
+                        <span>🐭</span><span>🐁</span><span>🐀</span><span>🐹</span><span>🐰</span><span>🐇</span><span>🐿️</span><span>🦔</span>
+                    </div>
                 </div>
-
-                <!-- Emoji Picker -->
-                <div id="emoji-picker" class="emoji-picker">
-                    <div class="emoji-category">
-                        <span>Smileys</span>
-                        <div class="emoji-grid">
-                            <span>😀</span><span>😃</span><span>😄</span><span>😁</span>
-                            <span>😆</span><span>😅</span><span>😂</span><span>🤣</span>
-                            <span>😊</span><span>😇</span><span>🙂</span><span>🙃</span>
-                            <span>😉</span><span>☠️ </span><span>😍</span><span>🥰</span>
-                        </div>
+                <div class="emoji-category">
+                    <span>objects</span>
+                    <div class="emoji-grid">
+                        <span>⌚</span><span>📱</span><span>📲</span><span>💻</span><span>📷</span><span>📸</span><span>🎥</span><span>📽</span>
+                        <span>📞</span><span>📺</span>🧭<span>⏰</span><span>⌛</span><span>💡</span><span>🔦</span><span>🧯</span><span>💸</span>
+                        <span>💵</span><span>💴</span><span>💰</span><span>💳</span><span>💎</span><span>⚖️ </span> 🔧</span>🔧<span> 🔨 </span><span>⚙️</span>
+                        <span> 🔗 </span><span>⛓ </span><span>🧰</span>🧲<span>⚗️ </span><span>🧪</span><span>🧫</span><span>🧬</span><span>🔬</span>
+                        <span>🔭</span><span>📡</span><span>💉</span><span>🩸</span><span>💊</span><span>🩹</span><span>🩺</span><span>🚪</span>
+                        <span>🪑</span><span>🚽</span><span>🚿</span><span>🧻</span><span>🧼</span><span>🧯</span><span>💉</span><span>🩹</span>
                     </div>
-                    <div class="emoji-category">
-                        <span>Animals & Nature</span>
-                        <div class="emoji-grid">
-                            <span>🐵</span><span>🐒</span><span>🦍</span><span>🦧</span><span>🐶</span><span>🐕</span><span>🦮</span><span>🐩</span>
-                            <span>🐺</span><span>🦊</span><span>🦝</span><span>🐱</span><span>🐈</span><span>🦁</span><span>🐯</span><span>🐅</span>
-                            <span>🐆</span><span>🐴</span><span>🐎</span><span>🦄</span><span>🦓</span><span>🦌</span><span>🐮</span><span>🐂</span>
-                            <span>🐃</span><span>🐄</span><span>🐷</span><span>🐖</span><span>🐗</span><span>🐽</span><span>🐏</span><span>🐑</span>
-                            <span>🐐</span><span>🐪</span><span>🐫</span><span>🦙</span><span>🦒</span><span>🐘</span><span>🦏</span><span>🦛</span>
-                            <span>🐭</span><span>🐁</span><span>🐀</span><span>🐹</span><span>🐰</span><span>🐇</span><span>🐿️</span><span>🦔</span>
-                        </div>
-                    </div>
-                    <div class="emoji-category">
-                        <span>objects</span>
-                        <div class="emoji-grid">
-                            <span>⌚</span><span>📱</span><span>📲</span><span>💻</span><span>📷</span><span>📸</span><span>🎥</span><span>📽</span>
-                            <span>📞</span><span>📺</span>🧭<span>⏰</span><span>⌛</span><span>💡</span><span>🔦</span><span>🧯</span><span>💸</span>
-                            <span>💵</span><span>💴</span><span>💰</span><span>💳</span><span>💎</span><span>⚖️ </span> 🔧</span>🔧<span> 🔨 </span><span>⚙️</span>
-                            <span> 🔗 </span><span>⛓ </span><span>🧰</span>🧲<span>⚗️ </span><span>🧪</span><span>🧫</span><span>🧬</span><span>🔬</span>
-                            <span>🔭</span><span>📡</span><span>💉</span><span>🩸</span><span>💊</span><span>🩹</span><span>🩺</span><span>🚪</span>
-                            <span>🪑</span><span>🚽</span><span>🚿</span><span>🧻</span><span>🧼</span><span>🧯</span><span>💉</span><span>🩹</span>
-                        </div>
-                    </div>
-
                 </div>
 
             </div>
-        </div>
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-        <script src="{{ url_for('static', filename='script.js') }}"></script>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 
 </html>
