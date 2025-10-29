@@ -1,4 +1,3 @@
-import os
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 import json
@@ -11,10 +10,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here_chatmate_2024'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Store active users and user database
+# Store active users and user database IN MEMORY
 users = {}
-user_db_file = 'users.json'
-MESSAGES_FILE = 'messages.json'
+users_db = {}  # In-memory user storage
+messages_storage = []  # In-memory messages storage
 
 # Avatar colors for user profiles
 AVATAR_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F']
@@ -24,20 +23,8 @@ def get_avatar_color(username):
     random.seed(username)
     return random.choice(AVATAR_COLORS)
 
-def load_users():
-    """Load users from JSON file"""
-    if os.path.exists(user_db_file):
-        try:
-            with open(user_db_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {}
-    return {}
-
 def save_user(username, password):
-    """Save user to database"""
-    users_db = load_users()
-    
+    """Save user to in-memory storage"""
     # Hash the password for security
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     
@@ -45,63 +32,41 @@ def save_user(username, password):
         'password': hashed_password,
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
-    
-    try:
-        with open(user_db_file, 'w', encoding='utf-8') as f:
-            json.dump(users_db, f, indent=2, ensure_ascii=False)
-        return True
-    except Exception as e:
-        print(f"Error saving user: {e}")
-        return False
+    print(f"User registered: {username}")  # Debug log
+    return True
 
 def verify_user(username, password):
-    """Verify user credentials"""
-    users_db = load_users()
-    
+    """Verify user credentials from in-memory storage"""
     if username in users_db:
         # Verify hashed password
         hashed_input = hashlib.sha256(password.encode()).hexdigest()
         return users_db[username]['password'] == hashed_input
-    
     return False
 
 def user_exists(username):
-    """Check if user exists"""
-    users_db = load_users()
+    """Check if user exists in memory"""
     return username in users_db
 
 def load_messages():
-    """Load messages from JSON file"""
-    if os.path.exists(MESSAGES_FILE):
-        try:
-            with open(MESSAGES_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return []
-    return []
+    """Load messages from memory"""
+    return messages_storage
 
 def save_message(username, message):
-    """Save a single message to JSON file"""
+    """Save a single message to memory"""
     message_data = {
         'username': username,
         'message': message,
         'timestamp': datetime.now().strftime('%H:%M:%S'),
-        'date': datetime.now().strftime('%Y-%m-%d'),  # Added date
         'avatar_color': get_avatar_color(username)
     }
     
-    messages = load_messages()
-    messages.append(message_data)
+    messages_storage.append(message_data)
     
-    # Keep only last 1000 messages to prevent file from getting too big
-    messages = messages[-1000:]
+    # Keep only last 100 messages to prevent memory issues
+    if len(messages_storage) > 100:
+        messages_storage.pop(0)
     
-    try:
-        with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
-            json.dump(messages, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"Error saving message: {e}")
-    
+    print(f"Message saved from {username}: {message}")  # Debug log
     return message_data
 
 @app.route('/')
@@ -208,7 +173,6 @@ def handle_send_message(data):
     
     emit('new_message', message_data, broadcast=True)
 
-# NEW: Typing indicators
 @socketio.on('typing_start')
 def handle_typing_start():
     """Handle when user starts typing"""
@@ -220,39 +184,6 @@ def handle_typing_start():
 def handle_typing_stop():
     """Handle when user stops typing"""
     emit('user_stopped_typing', broadcast=True)
-
-# NEW: Private messaging
-@socketio.on('private_message')
-def handle_private_message(data):
-    """Handle private/direct messages"""
-    user_data = users.get(request.sid, {})
-    username = user_data.get('username', 'Anonymous')
-    target_user = data.get('target_user')
-    message = data.get('message', '').strip()
-    
-    if not message or not target_user:
-        return
-    
-    # Find target user's socket ID
-    target_sid = None
-    for sid, user_info in users.items():
-        if user_info['username'] == target_user:
-            target_sid = sid
-            break
-    
-    if target_sid:
-        private_message_data = {
-            'from_user': username,
-            'message': message,
-            'timestamp': datetime.now().strftime('%H:%M:%S'),
-            'avatar_color': get_avatar_color(username)
-        }
-        
-        # Send to target user
-        emit('private_message_received', private_message_data, room=target_sid)
-        
-        # Send confirmation to sender
-        emit('private_message_sent', private_message_data)
 
 @socketio.on('get_online_users')
 def handle_get_online_users():
@@ -266,6 +197,9 @@ def handle_get_online_users():
     emit('online_users_list', {'users': online_users})
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    print(f"Starting ChatMate Server on port {port}...")
-    socketio.run(app, debug=False, host='0.0.0.0', port=port)
+    print("Starting ChatMate Server...")
+    print("Access your chat app at: http://127.0.0.1:8080")
+    print("For mobile access, use your computer's IP address")
+    print("Example: http://192.168.1.100:8080")
+    print("Press Ctrl+C to stop the server")
+    socketio.run(app, debug=True, host='0.0.0.0', port=8080)
