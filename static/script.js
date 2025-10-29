@@ -2,68 +2,93 @@ const socket = io(window.location.origin, {
     transports: ['websocket', 'polling']
 });
 
-// Initialize when page loads
+// Safe initialization
 document.addEventListener('DOMContentLoaded', function() {
-    setupEventListeners();
+    console.log('DOM loaded - setting up safe listeners');
+    setTimeout(initializeApp, 100);
 });
 
-function setupEventListeners() {
-    // Login form
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', loginUser);
-    }
-    setupPasswordToggle('password-input', 'password-toggle');
+function initializeApp() {
+    console.log('Initializing app...');
 
-    // Registration form
+    // Setup basic event listeners safely
+    setupSafeEventListeners();
+    setupFormSwitching();
+    setupPasswordToggles();
+    setupEmojiPicker();
+}
+
+function setupSafeEventListeners() {
+    console.log('Setting up safe event listeners...');
+
+    // Register button
     const registerBtn = document.getElementById('register-btn');
     if (registerBtn) {
-        registerBtn.addEventListener('click', registerUser);
-    }
-    setupPasswordToggle('register-password', 'register-password-toggle');
-    setupPasswordToggle('confirm-password', 'confirm-password-toggle');
-
-    // Password strength and match indicators
-    const registerPassword = document.getElementById('register-password');
-    if (registerPassword) {
-        registerPassword.addEventListener('input', function() {
-            checkPasswordStrength(this.value);
-            checkPasswordMatch();
-        });
+        console.log('✓ Register button found');
+        registerBtn.addEventListener('click', handleRegister);
+    } else {
+        console.log('✗ Register button NOT found');
     }
 
-    const confirmPassword = document.getElementById('confirm-password');
-    if (confirmPassword) {
-        confirmPassword.addEventListener('input', checkPasswordMatch);
+    // Login button
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+        console.log('✓ Login button found');
+        loginBtn.addEventListener('click', handleLogin);
     }
 
-    // Form switching
-    const showRegister = document.getElementById('show-register');
-    if (showRegister) {
-        showRegister.addEventListener('click', showRegisterForm);
-    }
-
-    const showLogin = document.getElementById('show-login');
-    if (showLogin) {
-        showLogin.addEventListener('click', showLoginForm);
-    }
-
-    // Chat functionality
+    // Send button
     const sendBtn = document.getElementById('send-btn');
     if (sendBtn) {
-        sendBtn.addEventListener('click', sendMessage);
+        sendBtn.addEventListener('click', handleSendMessage);
     }
 
+    // Emoji button
     const emojiBtn = document.getElementById('emoji-btn');
     if (emojiBtn) {
         emojiBtn.addEventListener('click', toggleEmojiPicker);
     }
 
-    // Enter key support
-    setupEnterKeySupport();
+    // Enter key for message input
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleSendMessage();
+        });
+    }
 
-    // Set up emoji picker
-    setupEmojiPicker();
+    // Enter key for forms
+    setupEnterKeySupport();
+}
+
+function setupFormSwitching() {
+    // Show register form
+    const showRegister = document.getElementById('show-register');
+    if (showRegister) {
+        showRegister.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+            clearMessages();
+        });
+    }
+
+    // Show login form
+    const showLogin = document.getElementById('show-login');
+    if (showLogin) {
+        showLogin.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+            clearMessages();
+        });
+    }
+}
+
+function setupPasswordToggles() {
+    setupPasswordToggle('password-input', 'password-toggle');
+    setupPasswordToggle('register-password', 'register-password-toggle');
+    setupPasswordToggle('confirm-password', 'confirm-password-toggle');
 }
 
 function setupPasswordToggle(inputId, toggleId) {
@@ -73,6 +98,7 @@ function setupPasswordToggle(inputId, toggleId) {
     if (!passwordInput || !toggleBtn) return;
 
     const eyeIcon = toggleBtn.querySelector('.eye-icon');
+    if (!eyeIcon) return;
 
     toggleBtn.addEventListener('click', function() {
         if (passwordInput.type === 'password') {
@@ -88,104 +114,24 @@ function setupPasswordToggle(inputId, toggleId) {
     });
 }
 
-function checkPasswordStrength(password) {
-    const strengthBar = document.getElementById('register-strength-bar');
-    const strengthText = document.getElementById('register-strength-text');
-
-    if (!strengthBar || !strengthText) return;
-
-    let strength = 0;
-    let text = '';
-    let className = '';
-
-    if (password.length === 0) {
-        strength = 0;
-        text = '';
-    } else if (password.length < 4) {
-        strength = 33;
-        text = 'Weak';
-        className = 'strength-weak';
-    } else if (password.length < 8) {
-        strength = 66;
-        text = 'Medium';
-        className = 'strength-medium';
-    } else {
-        strength = 100;
-        text = 'Strong';
-        className = 'strength-strong';
-    }
-
-    strengthBar.className = 'strength-bar ' + className;
-    strengthBar.style.width = strength + '%';
-    strengthText.textContent = text;
-}
-
-function checkPasswordMatch() {
-    const password = document.getElementById('register-password') ? .value || '';
-    const confirmPassword = document.getElementById('confirm-password') ? .value || '';
-    const matchIndicator = document.getElementById('password-match-indicator');
-
-    if (!matchIndicator) return;
-
-    if (confirmPassword.length === 0) {
-        matchIndicator.classList.remove('visible', 'valid', 'invalid');
-        return;
-    }
-
-    if (password === confirmPassword) {
-        matchIndicator.classList.add('visible', 'valid');
-        matchIndicator.classList.remove('invalid');
-    } else {
-        matchIndicator.classList.add('visible', 'invalid');
-        matchIndicator.classList.remove('valid');
-    }
-}
-
-function showRegisterForm() {
-    document.getElementById('loginForm').style.display = 'none';
-    document.getElementById('registerForm').style.display = 'block';
-    hideError();
-    hideSuccess();
-    // Clear registration form
-    document.getElementById('register-username').value = '';
-    document.getElementById('register-email').value = '';
-    document.getElementById('register-password').value = '';
-    document.getElementById('confirm-password').value = '';
-
-    const strengthBar = document.getElementById('register-strength-bar');
-    const strengthText = document.getElementById('register-strength-text');
-    const matchIndicator = document.getElementById('password-match-indicator');
-
-    if (strengthBar) strengthBar.style.width = '0%';
-    if (strengthText) strengthText.textContent = '';
-    if (matchIndicator) matchIndicator.classList.remove('visible', 'valid', 'invalid');
-}
-
-function showLoginForm() {
-    document.getElementById('registerForm').style.display = 'none';
-    document.getElementById('loginForm').style.display = 'block';
-    hideError();
-    hideSuccess();
-}
-
 function setupEnterKeySupport() {
-    // Login form - CHECK IF ELEMENTS EXIST FIRST
+    // Login form
     const loginEmail = document.getElementById('login-email');
     const passwordInput = document.getElementById('password-input');
 
     if (loginEmail) {
         loginEmail.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') loginUser();
+            if (e.key === 'Enter') handleLogin();
         });
     }
 
     if (passwordInput) {
         passwordInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') loginUser();
+            if (e.key === 'Enter') handleLogin();
         });
     }
 
-    // Registration form - CHECK IF ELEMENTS EXIST FIRST
+    // Registration form
     const registerUsername = document.getElementById('register-username');
     const registerEmail = document.getElementById('register-email');
     const registerPassword = document.getElementById('register-password');
@@ -193,87 +139,70 @@ function setupEnterKeySupport() {
 
     if (registerUsername) {
         registerUsername.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') registerUser();
+            if (e.key === 'Enter') handleRegister();
         });
     }
 
     if (registerEmail) {
         registerEmail.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') registerUser();
+            if (e.key === 'Enter') handleRegister();
         });
     }
 
     if (registerPassword) {
         registerPassword.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') registerUser();
+            if (e.key === 'Enter') handleRegister();
         });
     }
 
     if (confirmPassword) {
         confirmPassword.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') registerUser();
-        });
-    }
-
-    // Chat
-    const messageInput = document.getElementById('message-input');
-    if (messageInput) {
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendMessage();
+            if (e.key === 'Enter') handleRegister();
         });
     }
 }
 
-async function registerUser() {
+function handleRegister() {
     console.log('Register button clicked!');
 
-    const username = document.getElementById('register-username') ? .value.trim() || '';
-    const email = document.getElementById('register-email') ? .value.trim().toLowerCase() || '';
-    const password = document.getElementById('register-password') ? .value || '';
-    const confirmPassword = document.getElementById('confirm-password') ? .value || '';
+    // Get form values safely
+    const username = getValue('register-username');
+    const email = getValue('register-email');
+    const password = getValue('register-password');
+    const confirmPassword = getValue('confirm-password');
 
-    // Clear previous messages
-    hideError();
-    hideSuccess();
+    console.log('Form data:', { username, email, password, confirmPassword });
 
-    // Validate inputs
-    if (username.length < 2) {
-        showError('Username must be at least 2 characters long');
-        return;
-    }
-
-    if (username.length > 20) {
-        showError('Username must be less than 20 characters');
+    // Validation
+    if (!username || username.length < 2) {
+        showMessage('Username must be at least 2 characters', 'error');
         return;
     }
 
     if (!email || !email.includes('@')) {
-        showError('Please enter a valid email address');
+        showMessage('Please enter a valid email', 'error');
         return;
     }
 
-    if (password.length < 3) {
-        showError('Password must be at least 3 characters long');
+    if (!password || password.length < 3) {
+        showMessage('Password must be at least 3 characters', 'error');
         return;
     }
 
     if (password !== confirmPassword) {
-        showError('Passwords do not match');
+        showMessage('Passwords do not match', 'error');
         return;
     }
 
     // Show loading state
-    const registerBtn = document.getElementById('register-btn');
-    if (registerBtn) {
-        const originalText = registerBtn.textContent;
-        registerBtn.classList.add('btn-loading');
-        registerBtn.disabled = true;
-        registerBtn.textContent = 'Creating Account...';
+    const btn = document.getElementById('register-btn');
+    if (btn) {
+        btn.textContent = 'Creating Account...';
+        btn.disabled = true;
     }
 
-    try {
-        console.log('Sending registration request...');
-        const response = await fetch('/register', {
+    // Send registration request
+    fetch('/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -283,65 +212,64 @@ async function registerUser() {
                 email: email,
                 password: password
             })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Registration response:', data);
+            if (data.success) {
+                showMessage('Account created successfully! You can now login.', 'success');
+                // Switch to login form after delay
+                setTimeout(() => {
+                    document.getElementById('registerForm').style.display = 'none';
+                    document.getElementById('loginForm').style.display = 'block';
+                    // Pre-fill email
+                    const loginEmail = document.getElementById('login-email');
+                    if (loginEmail) loginEmail.value = email;
+                    clearMessages();
+                }, 2000);
+            } else {
+                showMessage(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Registration error:', error);
+            showMessage('Error connecting to server', 'error');
+        })
+        .finally(() => {
+            // Restore button
+            if (btn) {
+                btn.textContent = 'Create Account';
+                btn.disabled = false;
+            }
         });
-
-        const result = await response.json();
-        console.log('Registration response:', result);
-
-        if (result.success) {
-            showSuccess('Account created successfully! You can now login.');
-            // Switch to login form after delay
-            setTimeout(() => {
-                showLoginForm();
-                // Pre-fill email in login form
-                const loginEmail = document.getElementById('login-email');
-                if (loginEmail) loginEmail.value = email;
-                const passwordInput = document.getElementById('password-input');
-                if (passwordInput) passwordInput.focus();
-            }, 2000);
-        } else {
-            showError(result.message);
-        }
-    } catch (error) {
-        console.error('Registration error:', error);
-        showError('Error connecting to server');
-    } finally {
-        // Restore button state
-        const registerBtn = document.getElementById('register-btn');
-        if (registerBtn) {
-            registerBtn.classList.remove('btn-loading');
-            registerBtn.disabled = false;
-            registerBtn.textContent = 'Create Account';
-        }
-    }
 }
 
-function loginUser() {
-    const email = document.getElementById('login-email') ? .value.trim().toLowerCase() || '';
-    const password = document.getElementById('password-input') ? .value || '';
+function handleLogin() {
+    const email = getValue('login-email');
+    const password = getValue('password-input');
 
-    // Clear previous errors
-    hideError();
-
-    // Validate inputs
-    if (!email || !email.includes('@')) {
-        showError('Please enter a valid email address');
+    if (!email || !password) {
+        showMessage('Please enter email and password', 'error');
         return;
     }
 
-    if (password.length === 0) {
-        showError('Password is required');
+    // Add socket connection check
+    if (!socket || !socket.connected) {
+        showMessage('Not connected to server. Please refresh the page.', 'error');
         return;
     }
 
-    // Show loading state
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        loginBtn.classList.add('btn-loading');
-        loginBtn.disabled = true;
+    const btn = document.getElementById('login-btn');
+    if (btn) {
+        btn.textContent = 'Logging in...';
+        btn.disabled = true;
     }
 
-    // Join chat with credentials
     console.log('Attempting login with:', email);
     socket.emit('join_chat', {
         email: email,
@@ -349,81 +277,19 @@ function loginUser() {
     });
 }
 
-// Socket event handlers
-socket.on('error', function(data) {
-    console.log('Socket error:', data);
-    // Restore button state
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        loginBtn.classList.remove('btn-loading');
-        loginBtn.disabled = false;
-    }
-
-    showError(data.message);
-});
-
-socket.on('join_success', function(data) {
-    console.log('Login successful:', data);
-    // Restore button state
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        loginBtn.classList.remove('btn-loading');
-        loginBtn.disabled = false;
-    }
-
-    // Successful login
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('chatSection').style.display = 'flex';
-
+function handleSendMessage() {
     const messageInput = document.getElementById('message-input');
-    if (messageInput) messageInput.focus();
+    const message = messageInput ? messageInput.value.trim() : '';
 
-    createOnlineUsersPanel();
-
-    // Request online users list
-    socket.emit('get_online_users');
-});
-
-socket.on('user_joined', function(data) {
-    console.log('User joined:', data);
-    updateOnlineUsers(data.online_users);
-    showPopupNotification(`${data.username} joined the chat`, 'join');
-});
-
-socket.on('user_left', function(data) {
-    console.log('User left:', data);
-    updateOnlineUsers(data.online_users);
-    showPopupNotification(`${data.username} left the chat`, 'leave');
-});
-
-socket.on('new_message', function(data) {
-    console.log('New message:', data);
-    addMessage(data.username, data.message, data.timestamp, data.avatar_color);
-});
-
-socket.on('online_users_list', function(data) {
-    console.log('Online users:', data);
-    updateOnlineUsers(data.users);
-});
-
-socket.on('connect', function() {
-    console.log('Connected to server');
-});
-
-socket.on('disconnect', function() {
-    console.log('Disconnected from server');
-});
-
-function sendMessage() {
-    const messageInput = document.getElementById('message-input');
-    const message = messageInput ? .value.trim() || '';
-
-    if (message) {
-        console.log('Sending message:', message);
+    if (message && socket && socket.connected) {
         socket.emit('send_message', { message: message });
         messageInput.value = '';
+
+        // Hide emoji picker
         const emojiPicker = document.getElementById('emoji-picker');
         if (emojiPicker) emojiPicker.style.display = 'none';
+    } else if (message && (!socket || !socket.connected)) {
+        showMessage('Not connected to server', 'error');
     }
 }
 
@@ -434,6 +300,7 @@ function toggleEmojiPicker() {
     }
 }
 
+// Setup emoji picker
 function setupEmojiPicker() {
     const emojiGrid = document.querySelector('.emoji-grid');
     if (!emojiGrid) return;
@@ -448,26 +315,101 @@ function setupEmojiPicker() {
                 messageInput.value += emoji;
                 messageInput.focus();
             }
-            const emojiPicker = document.getElementById('emoji-picker');
-            if (emojiPicker) emojiPicker.style.display = 'none';
         });
     });
 }
 
-function createOnlineUsersPanel() {
-    // Remove existing panel if any
-    const existingPanel = document.querySelector('.online-users');
-    if (existingPanel) {
-        existingPanel.remove();
+// Close emoji picker when clicking outside
+document.addEventListener('click', function(event) {
+    const picker = document.getElementById('emoji-picker');
+    const emojiBtn = document.getElementById('emoji-btn');
+
+    if (picker && emojiBtn && !picker.contains(event.target) && !emojiBtn.contains(event.target)) {
+        picker.style.display = 'none';
+    }
+});
+
+// Socket event handlers
+socket.on('join_success', function(data) {
+    console.log('Login successful:', data);
+    const btn = document.getElementById('login-btn');
+    if (btn) {
+        btn.textContent = 'Login to Chat';
+        btn.disabled = false;
     }
 
-    const onlineUsersDiv = document.createElement('div');
-    onlineUsersDiv.className = 'online-users';
-    onlineUsersDiv.innerHTML = `
-        <h3>🟢 Online Users</h3>
-        <div id="users-list"></div>
-    `;
-    document.body.appendChild(onlineUsersDiv);
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('chatSection').style.display = 'flex';
+
+    // Focus on message input
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) messageInput.focus();
+});
+
+socket.on('error', function(data) {
+    console.log('Socket error:', data);
+    const btn = document.getElementById('login-btn');
+    if (btn) {
+        btn.textContent = 'Login to Chat';
+        btn.disabled = false;
+    }
+    showMessage(data.message, 'error');
+});
+
+socket.on('new_message', function(data) {
+    addMessage(data.username, data.message, data.timestamp, data.avatar_color);
+});
+
+socket.on('user_joined', function(data) {
+    addSystemMessage(`${data.username} joined the chat`);
+});
+
+socket.on('user_left', function(data) {
+    addSystemMessage(`${data.username} left the chat`);
+});
+
+socket.on('connect', function() {
+    console.log('Connected to server');
+    showMessage('Connected to server', 'success');
+    setTimeout(clearMessages, 3000);
+});
+
+socket.on('disconnect', function() {
+    console.log('Disconnected from server');
+    showMessage('Disconnected from server', 'error');
+});
+
+socket.on('connect_error', function(error) {
+    console.log('Connection error:', error);
+    showMessage('Connection failed. Please refresh the page.', 'error');
+});
+
+// Helper functions
+function getValue(elementId) {
+    const element = document.getElementById(elementId);
+    return element ? element.value.trim() : '';
+}
+
+function showMessage(message, type) {
+    const errorDiv = document.getElementById('error-message');
+    const successDiv = document.getElementById('success-message');
+
+    if (type === 'error' && errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        if (successDiv) successDiv.style.display = 'none';
+    } else if (type === 'success' && successDiv) {
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+        if (errorDiv) errorDiv.style.display = 'none';
+    }
+}
+
+function clearMessages() {
+    const errorDiv = document.getElementById('error-message');
+    const successDiv = document.getElementById('success-message');
+    if (errorDiv) errorDiv.style.display = 'none';
+    if (successDiv) successDiv.style.display = 'none';
 }
 
 function addMessage(username, message, timestamp = 'Just now', avatarColor = '#666666') {
@@ -492,120 +434,27 @@ function addMessage(username, message, timestamp = 'Just now', avatarColor = '#6
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function updateOnlineUsers(users) {
-    const usersList = document.getElementById('users-list');
-    if (!usersList) return;
+function addSystemMessage(message) {
+    const chatMessages = document.getElementById('chat-messages');
+    if (!chatMessages) return;
 
-    usersList.innerHTML = '';
-    users.forEach(user => {
-        addOnlineUser(user.username, user.avatar_color);
-    });
+    const systemDiv = document.createElement('div');
+    systemDiv.className = 'system-message';
+    systemDiv.textContent = message;
+
+    chatMessages.appendChild(systemDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function addOnlineUser(username, avatarColor) {
-    const usersList = document.getElementById('users-list');
-    if (!usersList) return;
-
-    const userInitial = username.charAt(0).toUpperCase();
-
-    const userItem = document.createElement('div');
-    userItem.className = 'user-item';
-    userItem.id = `user-${username}`;
-    userItem.innerHTML = `
-        <div class="user-avatar" style="background: ${avatarColor}">${userInitial}</div>
-        <span class="username">${username}</span>
-        <span class="online-status">🟢</span>
-    `;
-
-    usersList.appendChild(userItem);
+// Export for testing (if needed)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        handleLogin,
+        handleRegister,
+        handleSendMessage,
+        addMessage,
+        addSystemMessage
+    };
 }
 
-function removeOnlineUser(username) {
-    const userElement = document.getElementById(`user-${username}`);
-    if (userElement) {
-        userElement.remove();
-    }
-}
-
-function showError(message) {
-    const errorDiv = document.getElementById('error-message');
-    if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.classList.add('show');
-    }
-}
-
-function hideError() {
-    const errorDiv = document.getElementById('error-message');
-    if (errorDiv) {
-        errorDiv.classList.remove('show');
-    }
-}
-
-function showSuccess(message) {
-    const successDiv = document.getElementById('success-message');
-    if (successDiv) {
-        successDiv.textContent = message;
-        successDiv.classList.add('show');
-    }
-}
-
-function hideSuccess() {
-    const successDiv = document.getElementById('success-message');
-    if (successDiv) {
-        successDiv.classList.remove('show');
-    }
-}
-
-function showPopupNotification(message, type) {
-    const notification = document.createElement('div');
-    notification.className = `popup-notification ${type}`;
-
-    const icon = type === 'join' ? '🟢' : '🔴';
-
-    notification.innerHTML = `
-        <div class="popup-content">
-            <span class="popup-icon">${icon}</span>
-            <span class="popup-text">${message}</span>
-        </div>
-    `;
-
-    document.body.appendChild(notification);
-
-    // Position notification
-    const onlinePanel = document.querySelector('.online-users');
-    let topPosition = 15;
-    if (onlinePanel) {
-        const panelRect = onlinePanel.getBoundingClientRect();
-        topPosition = panelRect.bottom + 10;
-    }
-
-    notification.style.top = `${topPosition}px`;
-    notification.style.right = '15px';
-
-    // Show animation
-    setTimeout(() => {
-        notification.classList.add('show');
-    }, 100);
-
-    // Auto hide after 3 seconds
-    setTimeout(() => {
-        notification.classList.remove('show');
-        notification.classList.add('hide');
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 300);
-    }, 3000);
-}
-
-// Close emoji picker when clicking outside
-document.addEventListener('click', function(event) {
-    const picker = document.getElementById('emoji-picker');
-    const emojiBtn = document.getElementById('emoji-btn');
-
-    if (picker && emojiBtn && !picker.contains(event.target) && !emojiBtn.contains(event.target)) {
-        picker.style.display = 'none';
-    }
-});
+console.log('ChatMate JavaScript loaded safely!');
