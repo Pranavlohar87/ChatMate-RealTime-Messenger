@@ -1,4 +1,6 @@
-const socket = io();
+const socket = io(window.location.origin, {
+    transports: ['websocket', 'polling']
+});
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -129,6 +131,61 @@ function showLoginForm() {
 }
 
 function setupEnterKeySupport() {
+    function setupEnterKeySupport() {
+        // Login form - CHECK IF ELEMENTS EXIST FIRST
+        const loginEmail = document.getElementById('login-email');
+        const passwordInput = document.getElementById('password-input');
+
+        if (loginEmail) {
+            loginEmail.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') loginUser();
+            });
+        }
+
+        if (passwordInput) {
+            passwordInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') loginUser();
+            });
+        }
+
+        // Registration form - CHECK IF ELEMENTS EXIST FIRST
+        const registerUsername = document.getElementById('register-username');
+        const registerEmail = document.getElementById('register-email');
+        const registerPassword = document.getElementById('register-password');
+        const confirmPassword = document.getElementById('confirm-password');
+
+        if (registerUsername) {
+            registerUsername.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') registerUser();
+            });
+        }
+
+        if (registerEmail) {
+            registerEmail.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') registerUser();
+            });
+        }
+
+        if (registerPassword) {
+            registerPassword.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') registerUser();
+            });
+        }
+
+        if (confirmPassword) {
+            confirmPassword.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') registerUser();
+            });
+        }
+
+        // Chat
+        const messageInput = document.getElementById('message-input');
+        if (messageInput) {
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') sendMessage();
+            });
+        }
+    }
     // Login form
     document.getElementById('login-email').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') loginUser();
