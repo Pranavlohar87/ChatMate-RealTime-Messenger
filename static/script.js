@@ -1,5 +1,8 @@
 const socket = io(window.location.origin, {
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
 });
 
 // Safe initialization
@@ -16,6 +19,7 @@ function initializeApp() {
     setupFormSwitching();
     setupPasswordToggles();
     setupEmojiPicker();
+    setupPasswordValidation();
 }
 
 function setupSafeEventListeners() {
@@ -114,6 +118,99 @@ function setupPasswordToggle(inputId, toggleId) {
     });
 }
 
+// NEW: Password validation setup
+function setupPasswordValidation() {
+    const registerPassword = document.getElementById('register-password');
+    const confirmPassword = document.getElementById('confirm-password');
+
+    if (registerPassword) {
+        registerPassword.addEventListener('input', function() {
+            checkPasswordStrength(this.value);
+            checkPasswordMatch();
+        });
+    }
+
+    if (confirmPassword) {
+        confirmPassword.addEventListener('input', checkPasswordMatch);
+    }
+}
+
+// NEW: Password strength checker
+function checkPasswordStrength(password) {
+    const strengthBar = document.getElementById('register-strength-bar');
+    const strengthText = document.getElementById('register-strength-text');
+    
+    if (!strengthBar || !strengthText) return;
+
+    let strength = 0;
+    let text = '';
+    let color = '';
+
+    // Reset
+    strengthBar.className = 'strength-bar';
+    strengthBar.style.width = '0%';
+
+    if (password.length === 0) {
+        strengthText.textContent = '';
+        return;
+    }
+
+    // Length check
+    if (password.length >= 8) strength++;
+    
+    // Contains numbers
+    if (/\d/.test(password)) strength++;
+    
+    // Contains special characters
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) strength++;
+    
+    // Contains uppercase and lowercase
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+
+    switch(strength) {
+        case 0:
+        case 1:
+            text = 'Weak';
+            color = 'strength-weak';
+            break;
+        case 2:
+        case 3:
+            text = 'Medium';
+            color = 'strength-medium';
+            break;
+        case 4:
+            text = 'Strong';
+            color = 'strength-strong';
+            break;
+    }
+
+    strengthBar.className = 'strength-bar ' + color;
+    strengthText.textContent = text;
+    strengthText.style.color = getComputedStyle(document.documentElement).getPropertyValue('--' + color.split('-')[1]);
+}
+
+// NEW: Password match checker
+function checkPasswordMatch() {
+    const password = document.getElementById('register-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    const matchIndicator = document.getElementById('password-match-indicator');
+    
+    if (!matchIndicator) return;
+
+    if (confirmPassword.length === 0) {
+        matchIndicator.className = 'password-match';
+        return;
+    }
+
+    if (password === confirmPassword && password.length > 0) {
+        matchIndicator.className = 'password-match visible valid';
+        matchIndicator.querySelector('.match-text').textContent = 'Passwords match';
+    } else {
+        matchIndicator.className = 'password-match visible invalid';
+        matchIndicator.querySelector('.match-text').textContent = 'Passwords do not match';
+    }
+}
+
 function setupEnterKeySupport() {
     // Login form
     const loginEmail = document.getElementById('login-email');
@@ -179,13 +276,13 @@ function handleRegister() {
         return;
     }
 
-    if (!email || !email.includes('@')) {
-        showMessage('Please enter a valid email', 'error');
+    if (!email || !email.includes('@') || !email.includes('.')) {
+        showMessage('Please enter a valid email address', 'error');
         return;
     }
 
-    if (!password || password.length < 3) {
-        showMessage('Password must be at least 3 characters', 'error');
+    if (!password || password.length < 6) {
+        showMessage('Password must be at least 6 characters', 'error');
         return;
     }
 
@@ -199,6 +296,7 @@ function handleRegister() {
     if (btn) {
         btn.textContent = 'Creating Account...';
         btn.disabled = true;
+        btn.classList.add('btn-loading');
     }
 
     // Send registration request
@@ -233,18 +331,19 @@ function handleRegister() {
                     clearMessages();
                 }, 2000);
             } else {
-                showMessage(data.message, 'error');
+                showMessage(data.message || 'Registration failed', 'error');
             }
         })
         .catch(error => {
             console.error('Registration error:', error);
-            showMessage('Error connecting to server', 'error');
+            showMessage('Error connecting to server. Please try again.', 'error');
         })
         .finally(() => {
             // Restore button
             if (btn) {
                 btn.textContent = 'Create Account';
                 btn.disabled = false;
+                btn.classList.remove('btn-loading');
             }
         });
 }
@@ -258,23 +357,50 @@ function handleLogin() {
         return;
     }
 
-    // Add socket connection check
-    if (!socket || !socket.connected) {
-        showMessage('Not connected to server. Please refresh the page.', 'error');
+    // Validate email format
+    if (!email.includes('@') || !email.includes('.')) {
+        showMessage('Please enter a valid email address', 'error');
         return;
     }
 
+    // Show loading state
     const btn = document.getElementById('login-btn');
     if (btn) {
         btn.textContent = 'Logging in...';
         btn.disabled = true;
+        btn.classList.add('btn-loading');
     }
 
     console.log('Attempting login with:', email);
-    socket.emit('join_chat', {
-        email: email,
-        password: password
-    });
+    
+    // Check socket connection first
+    if (!socket.connected) {
+        console.log('Socket not connected, attempting to connect...');
+        socket.connect();
+        
+        // Wait a moment for connection
+        setTimeout(() => {
+            if (socket.connected) {
+                socket.emit('join_chat', {
+                    email: email,
+                    password: password
+                });
+            } else {
+                showMessage('Connection failed. Please refresh the page.', 'error');
+                if (btn) {
+                    btn.textContent = 'Login to Chat';
+                    btn.disabled = false;
+                    btn.classList.remove('btn-loading');
+                }
+            }
+        }, 1000);
+    } else {
+        // Socket is already connected
+        socket.emit('join_chat', {
+            email: email,
+            password: password
+        });
+    }
 }
 
 function handleSendMessage() {
@@ -329,13 +455,31 @@ document.addEventListener('click', function(event) {
     }
 });
 
-// Socket event handlers
+// ===== SOCKET EVENT HANDLERS =====
+
+socket.on('connect', function() {
+    console.log('✅ Connected to server');
+    showMessage('Connected to server', 'success');
+    setTimeout(clearMessages, 3000);
+});
+
+socket.on('disconnect', function() {
+    console.log('❌ Disconnected from server');
+    showMessage('Disconnected from server', 'error');
+});
+
+socket.on('connect_error', function(error) {
+    console.log('❌ Connection error:', error);
+    showMessage('Connection failed. Please refresh the page.', 'error');
+});
+
 socket.on('join_success', function(data) {
-    console.log('Login successful:', data);
+    console.log('✅ Login successful:', data);
     const btn = document.getElementById('login-btn');
     if (btn) {
         btn.textContent = 'Login to Chat';
         btn.disabled = false;
+        btn.classList.remove('btn-loading');
     }
 
     document.getElementById('loginSection').style.display = 'none';
@@ -344,16 +488,20 @@ socket.on('join_success', function(data) {
     // Focus on message input
     const messageInput = document.getElementById('message-input');
     if (messageInput) messageInput.focus();
+    
+    showMessage('Login successful!', 'success');
+    setTimeout(clearMessages, 2000);
 });
 
 socket.on('error', function(data) {
-    console.log('Socket error:', data);
+    console.log('❌ Socket error:', data);
     const btn = document.getElementById('login-btn');
     if (btn) {
         btn.textContent = 'Login to Chat';
         btn.disabled = false;
+        btn.classList.remove('btn-loading');
     }
-    showMessage(data.message, 'error');
+    showMessage(data.message || 'Login failed', 'error');
 });
 
 socket.on('new_message', function(data) {
@@ -368,23 +516,8 @@ socket.on('user_left', function(data) {
     addSystemMessage(`${data.username} left the chat`);
 });
 
-socket.on('connect', function() {
-    console.log('Connected to server');
-    showMessage('Connected to server', 'success');
-    setTimeout(clearMessages, 3000);
-});
+// ===== HELPER FUNCTIONS =====
 
-socket.on('disconnect', function() {
-    console.log('Disconnected from server');
-    showMessage('Disconnected from server', 'error');
-});
-
-socket.on('connect_error', function(error) {
-    console.log('Connection error:', error);
-    showMessage('Connection failed. Please refresh the page.', 'error');
-});
-
-// Helper functions
 function getValue(elementId) {
     const element = document.getElementById(elementId);
     return element ? element.value.trim() : '';
@@ -398,10 +531,20 @@ function showMessage(message, type) {
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
         if (successDiv) successDiv.style.display = 'none';
+        
+        // Auto-hide error after 5 seconds
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
     } else if (type === 'success' && successDiv) {
         successDiv.textContent = message;
         successDiv.style.display = 'block';
         if (errorDiv) errorDiv.style.display = 'none';
+        
+        // Auto-hide success after 3 seconds
+        setTimeout(() => {
+            successDiv.style.display = 'none';
+        }, 3000);
     }
 }
 
@@ -457,4 +600,4 @@ if (typeof module !== 'undefined' && module.exports) {
     };
 }
 
-console.log('ChatMate JavaScript loaded safely!');
+console.log('✅ ChatMate JavaScript loaded safely!');
