@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, jsonify, session
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
 import json
 import random
 from datetime import datetime
@@ -8,12 +8,16 @@ import re
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here_chatmate_2024'
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# FIXED: Proper SocketIO configuration
+socketio = SocketIO(app, 
+                   cors_allowed_origins="*",
+                   async_mode='threading')
 
 # Store data in memory
 users_db = {}
 messages_storage = []
-online_users = {}  # {socket_id: user_data}
+online_users = {}
 
 # Avatar colors
 AVATAR_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F']
@@ -63,45 +67,51 @@ def save_message(username, message, email):
     print(f"Message from {username}: {message}")
     return message_data
 
-def get_online_users_list():
-    return [{'username': user['username'], 'avatar_color': user['avatar_color']} 
-            for user in online_users.values()]
-
 @app.route('/')
 def home():
     return render_template('index.html')
 
 @app.route('/register', methods=['POST'])
 def register_user():
-    data = request.get_json()
-    username = data.get('username', '').strip()
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    
-    if not username or len(username) < 2:
-        return jsonify({'success': False, 'message': 'Username must be at least 2 characters long'})
-    
-    if len(username) > 20:
-        return jsonify({'success': False, 'message': 'Username must be less than 20 characters'})
-    
-    if not is_valid_email(email):
-        return jsonify({'success': False, 'message': 'Please enter a valid email address'})
-    
-    if not password or len(password) < 3:
-        return jsonify({'success': False, 'message': 'Password must be at least 3 characters long'})
-    
-    if user_exists(email):
-        return jsonify({'success': False, 'message': 'Email already registered'})
-    
-    if save_user(username, email, password):
-        return jsonify({'success': True, 'message': 'User registered successfully'})
-    else:
-        return jsonify({'success': False, 'message': 'Error creating user'})
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data received'})
+            
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        
+        print(f"Registration attempt: {username}, {email}")
+        
+        if not username or len(username) < 2:
+            return jsonify({'success': False, 'message': 'Username must be at least 2 characters long'})
+        
+        if len(username) > 20:
+            return jsonify({'success': False, 'message': 'Username must be less than 20 characters'})
+        
+        if not is_valid_email(email):
+            return jsonify({'success': False, 'message': 'Please enter a valid email address'})
+        
+        if not password or len(password) < 3:
+            return jsonify({'success': False, 'message': 'Password must be at least 3 characters long'})
+        
+        if user_exists(email):
+            return jsonify({'success': False, 'message': 'Email already registered'})
+        
+        if save_user(username, email, password):
+            return jsonify({'success': True, 'message': 'User registered successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Error creating user'})
+            
+    except Exception as e:
+        print(f"Registration error: {e}")
+        return jsonify({'success': False, 'message': 'Server error'})
 
 # SocketIO Events
 @socketio.on('connect')
 def handle_connect():
-    print('New user connected:', request.sid)
+    print('User connected:', request.sid)
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -109,57 +119,49 @@ def handle_disconnect():
         user_data = online_users[request.sid]
         username = user_data['username']
         del online_users[request.sid]
-        
-        # Notify all users
-        emit('user_left', {
-            'username': username,
-            'online_users': get_online_users_list()
-        }, broadcast=True)
+        emit('user_left', {'username': username}, broadcast=True)
         print(f'{username} disconnected')
 
 @socketio.on('join_chat')
 def handle_join(data):
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    
-    if not email or not password:
-        emit('error', {'message': 'Email and password required'})
-        return
-    
-    # Verify user credentials
-    if not verify_user(email, password):
-        emit('error', {'message': 'Invalid email or password'})
-        return
-    
-    # Get user data
-    user_data = users_db[email]
-    username = user_data['username']
-    
-    # Store online user
-    online_users[request.sid] = {
-        'username': username,
-        'email': email,
-        'avatar_color': get_avatar_color(username)
-    }
-    
-    # Send success to user
-    emit('join_success', {
-        'username': username,
-        'email': email
-    })
-    
-    # Send message history
-    messages = messages_storage[-50:]
-    for msg in messages:
-        emit('new_message', msg)
-    
-    # Notify all users about new user and online users
-    emit('user_joined', {
-        'username': username,
-        'online_users': get_online_users_list()
-    }, broadcast=True)
-    
-    print(f'{username} joined the chat. Online users: {len(online_users)}')
+    try:
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        
+        print(f"Login attempt: {email}")
+        
+        if not email or not password:
+            emit('error', {'message': 'Email and password required'})
+            return
+        
+        if not verify_user(email, password):
+            emit('error', {'message': 'Invalid email or password'})
+            return
+        
+        user_data = users_db[email]
+        username = user_data['username']
+        
+        online_users[request.sid] = {
+            'username': username,
+            'email': email,
+            'avatar_color': get_avatar_color(username)
+        }
+        
+        emit('join_success', {
+            'username': username,
+            'email': email
+        })
+        
+        messages = messages_storage[-50:]
+        for msg in messages:
+            emit('new_message', msg)
+        
+        emit('user_joined', {'username': username}, broadcast=True)
+        print(f'{username} joined the chat')
+        
+    except Exception as e:
+        print(f"Login error: {e}")
+        emit('error', {'message': 'Login failed'})
 
 @socketio.on('send_message')
 def handle_send_message(data):
@@ -174,17 +176,8 @@ def handle_send_message(data):
     if not message:
         return
     
-    if len(message) > 1000:
-        emit('error', {'message': 'Message too long (max 1000 characters)'})
-        return
-    
-    # Save and broadcast message
     message_data = save_message(username, message, email)
     emit('new_message', message_data, broadcast=True)
-
-@socketio.on('get_online_users')
-def handle_get_online_users():
-    emit('online_users_list', {'users': get_online_users_list()})
 
 if __name__ == '__main__':
     print("Starting ChatMate Server...")
