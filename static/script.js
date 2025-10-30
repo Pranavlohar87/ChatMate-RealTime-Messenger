@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentUser = { username: data.username };
         showSuccessMessage(`Welcome ${data.username}!`);
         switchToChat();
-        updateOnlineUsers(); // Show online users panel
+        updateOnlineUsers();
     });
 
     socket.on('login_error', function(data) {
@@ -80,13 +80,13 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('user_joined', function(data) {
         console.log('👋 User joined:', data);
         displaySystemMessage(`${data.username} joined the chat`, data.timestamp);
-        socket.emit('get_online_users'); // Refresh online users
+        socket.emit('get_online_users');
     });
 
     socket.on('user_left', function(data) {
         console.log('👋 User left:', data);
         displaySystemMessage(`${data.username} left the chat`, data.timestamp);
-        socket.emit('get_online_users'); // Refresh online users
+        socket.emit('get_online_users');
     });
 
     socket.on('online_users_update', function(data) {
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Send Message
+    // Send Message - INSTANT DISPLAY
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
@@ -205,11 +205,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function sendMessage() {
         const message = messageInput.value.trim();
         if (message && isConnected) {
+            // Display message instantly
+            displayOwnMessageInstantly(message);
+            
+            // Clear input immediately
+            messageInput.value = '';
+            hideEmojiPicker();
+            
+            // Send to server
             socket.emit('send_message', {
                 message: message
             });
-            messageInput.value = '';
-            hideEmojiPicker();
         }
     }
 
@@ -256,6 +262,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== MESSAGE DISPLAY FUNCTIONS =====
     function displayMessage(data) {
+        // Check if this is our own message (already displayed instantly)
+        if (currentUser && data.username === currentUser.username) {
+            return; // Skip duplicate display
+        }
+        
         const messageDiv = document.createElement('div');
         const isOwnMessage = currentUser && data.username === currentUser.username;
         messageDiv.className = `message ${isOwnMessage ? 'own-message' : ''}`;
@@ -271,6 +282,35 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="text">${escapeHtml(data.message)}</div>
             <div class="timestamp">${data.timestamp}</div>
+        `;
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function displayOwnMessageInstantly(message) {
+        if (!currentUser) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message own-message';
+        
+        const avatarColor = stringToColor(currentUser.username);
+        const timestamp = new Date().toLocaleTimeString('en-US', { 
+            hour12: true, 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
+        
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <div class="avatar" style="background-color: ${avatarColor}">
+                    ${currentUser.username.charAt(0).toUpperCase()}
+                </div>
+                <span class="username">${currentUser.username} (You)</span>
+            </div>
+            <div class="text">${escapeHtml(message)}</div>
+            <div class="timestamp">${timestamp}</div>
         `;
         
         chatMessages.appendChild(messageDiv);
