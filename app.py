@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 
 app = Flask(__name__)
@@ -13,7 +13,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize extensions
 db = SQLAlchemy(app)
 
-# SIMPLE Socket.io configuration - Remove eventlet
+# Socket.io configuration
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Database Models
@@ -22,7 +22,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -33,7 +33,7 @@ class User(db.Model):
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     room = db.Column(db.String(50), default='general')
     
@@ -90,7 +90,7 @@ def handle_disconnect():
         user_data = active_users[request.sid]
         emit('user_left', {
             'username': user_data['username'],
-            'timestamp': datetime.utcnow().strftime('%H:%M:%S')
+            'timestamp': datetime.now(timezone.utc).strftime('%H:%M:%S')
         }, room='general', include_self=False)
         del active_users[request.sid]
 
@@ -115,7 +115,7 @@ def handle_join_chat(data):
         
         emit('user_joined', {
             'username': user.username,
-            'timestamp': datetime.utcnow().strftime('%H:%M:%S')
+            'timestamp': datetime.now(timezone.utc).strftime('%H:%M:%S')
         }, room='general', include_self=False)
         
         emit('join_success', {
@@ -160,7 +160,7 @@ def handle_send_message(data):
         emit('new_message', {
             'username': user_data['username'],
             'message': message_content,
-            'timestamp': datetime.utcnow().strftime('%H:%M:%S')
+            'timestamp': datetime.now(timezone.utc).strftime('%H:%M:%S')
         }, room='general')
     
     except Exception as e:
