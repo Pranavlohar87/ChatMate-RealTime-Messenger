@@ -173,4 +173,4 @@ def health():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     print(f'🚀 Starting ChatMate server on port {port}')
-    socketio.run(app, host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
