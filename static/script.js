@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentUser = { username: data.username };
         showSuccessMessage(`Welcome ${data.username}!`);
         switchToChat();
-        updateOnlineUsers();
+        updateOnlineUsers(); // Show online users panel
     });
 
     socket.on('login_error', function(data) {
@@ -80,13 +80,13 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('user_joined', function(data) {
         console.log('👋 User joined:', data);
         displaySystemMessage(`${data.username} joined the chat`, data.timestamp);
-        socket.emit('get_online_users');
+        socket.emit('get_online_users'); // Refresh online users
     });
 
     socket.on('user_left', function(data) {
         console.log('👋 User left:', data);
         displaySystemMessage(`${data.username} left the chat`, data.timestamp);
-        socket.emit('get_online_users');
+        socket.emit('get_online_users'); // Refresh online users
     });
 
     socket.on('online_users_update', function(data) {
@@ -161,37 +161,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Send registration request
         fetch('/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username: username,
-                    email: email,
-                    password: password
-                })
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                password: password
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showSuccessMessage('Account created successfully! Please login.');
-                    registerForm.style.display = 'none';
-                    loginForm.style.display = 'block';
-                    // Clear registration form
-                    document.getElementById('register-username').value = '';
-                    document.getElementById('register-email').value = '';
-                    registerPassword.value = '';
-                    confirmPassword.value = '';
-                } else {
-                    showErrorMessage(data.message);
-                }
-                enableRegisterButton();
-            })
-            .catch(error => {
-                console.error('Registration error:', error);
-                showErrorMessage('Registration failed. Please try again.');
-                enableRegisterButton();
-            });
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessMessage('Account created successfully! Please login.');
+                registerForm.style.display = 'none';
+                loginForm.style.display = 'block';
+                // Clear registration form
+                document.getElementById('register-username').value = '';
+                document.getElementById('register-email').value = '';
+                registerPassword.value = '';
+                confirmPassword.value = '';
+            } else {
+                showErrorMessage(data.message);
+            }
+            enableRegisterButton();
+        })
+        .catch(error => {
+            console.error('Registration error:', error);
+            showErrorMessage('Registration failed. Please try again.');
+            enableRegisterButton();
+        });
     });
 
     // Send Message
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const inputs = [passwordInput, registerPassword, confirmPassword];
             const input = inputs[index];
             const eyeIcon = toggle.querySelector('.eye-icon');
-
+            
             if (input.type === 'password') {
                 input.type = 'text';
                 eyeIcon.textContent = '👁️‍🗨️';
@@ -254,14 +254,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Message Display Functions
+    // ===== MESSAGE DISPLAY FUNCTIONS =====
     function displayMessage(data) {
         const messageDiv = document.createElement('div');
         const isOwnMessage = currentUser && data.username === currentUser.username;
         messageDiv.className = `message ${isOwnMessage ? 'own-message' : ''}`;
-
+        
         const avatarColor = stringToColor(data.username);
-
+        
         messageDiv.innerHTML = `
             <div class="message-header">
                 <div class="avatar" style="background-color: ${avatarColor}">
@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="text">${escapeHtml(data.message)}</div>
             <div class="timestamp">${data.timestamp}</div>
         `;
-
+        
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -285,16 +285,19 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // Online Users Functions
+    // ===== ONLINE USERS FUNCTIONS =====
     function updateOnlineUsers() {
         const onlineUsersPanel = document.getElementById('onlineUsersPanel');
-        onlineUsersPanel.style.display = 'block';
-        socket.emit('get_online_users');
+        if (onlineUsersPanel) {
+            onlineUsersPanel.style.display = 'block';
+            socket.emit('get_online_users');
+        }
     }
 
     function updateOnlineUsersList(users) {
         const usersList = document.getElementById('usersList');
-
+        if (!usersList) return;
+        
         if (!users || users.length === 0) {
             usersList.innerHTML = '<div class="user-item">No users online</div>';
             return;
@@ -318,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
         usersList.innerHTML = usersHTML;
     }
 
-    // Utility Functions
+    // ===== UTILITY FUNCTIONS =====
     function switchToChat() {
         loginSection.style.display = 'none';
         chatSection.style.display = 'flex';
@@ -413,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         passwordMatch.classList.add('visible');
-
+        
         if (password === confirm && password.length > 0) {
             passwordMatch.classList.add('valid');
             passwordMatch.classList.remove('invalid');
@@ -440,9 +443,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <span class="status-dot ${type}"></span>
             ${message}
         `;
-
+        
         document.body.appendChild(statusDiv);
-
+        
         // Auto-remove after 3 seconds
         setTimeout(() => {
             if (statusDiv.parentNode) {
