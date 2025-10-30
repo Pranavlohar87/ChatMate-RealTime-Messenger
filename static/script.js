@@ -1,603 +1,474 @@
-const socket = io(window.location.origin, {
-    transports: ['websocket', 'polling'],
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000
-});
-
-// Safe initialization
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded - setting up safe listeners');
-    setTimeout(initializeApp, 100);
-});
-
-function initializeApp() {
-    console.log('Initializing app...');
-
-    // Setup basic event listeners safely
-    setupSafeEventListeners();
-    setupFormSwitching();
-    setupPasswordToggles();
-    setupEmojiPicker();
-    setupPasswordValidation();
-}
-
-function setupSafeEventListeners() {
-    console.log('Setting up safe event listeners...');
-
-    // Register button
-    const registerBtn = document.getElementById('register-btn');
-    if (registerBtn) {
-        console.log('✓ Register button found');
-        registerBtn.addEventListener('click', handleRegister);
-    } else {
-        console.log('✗ Register button NOT found');
-    }
-
-    // Login button
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        console.log('✓ Login button found');
-        loginBtn.addEventListener('click', handleLogin);
-    }
-
-    // Send button
-    const sendBtn = document.getElementById('send-btn');
-    if (sendBtn) {
-        sendBtn.addEventListener('click', handleSendMessage);
-    }
-
-    // Emoji button
-    const emojiBtn = document.getElementById('emoji-btn');
-    if (emojiBtn) {
-        emojiBtn.addEventListener('click', toggleEmojiPicker);
-    }
-
-    // Enter key for message input
-    const messageInput = document.getElementById('message-input');
-    if (messageInput) {
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleSendMessage();
-        });
-    }
-
-    // Enter key for forms
-    setupEnterKeySupport();
-}
-
-function setupFormSwitching() {
-    // Show register form
-    const showRegister = document.getElementById('show-register');
-    if (showRegister) {
-        showRegister.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.getElementById('loginForm').style.display = 'none';
-            document.getElementById('registerForm').style.display = 'block';
-            clearMessages();
-        });
-    }
-
-    // Show login form
-    const showLogin = document.getElementById('show-login');
-    if (showLogin) {
-        showLogin.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.getElementById('registerForm').style.display = 'none';
-            document.getElementById('loginForm').style.display = 'block';
-            clearMessages();
-        });
-    }
-}
-
-function setupPasswordToggles() {
-    setupPasswordToggle('password-input', 'password-toggle');
-    setupPasswordToggle('register-password', 'register-password-toggle');
-    setupPasswordToggle('confirm-password', 'confirm-password-toggle');
-}
-
-function setupPasswordToggle(inputId, toggleId) {
-    const passwordInput = document.getElementById(inputId);
-    const toggleBtn = document.getElementById(toggleId);
-
-    if (!passwordInput || !toggleBtn) return;
-
-    const eyeIcon = toggleBtn.querySelector('.eye-icon');
-    if (!eyeIcon) return;
-
-    toggleBtn.addEventListener('click', function() {
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            eyeIcon.textContent = '🔒';
-            toggleBtn.title = 'Hide password';
-        } else {
-            passwordInput.type = 'password';
-            eyeIcon.textContent = '👁️';
-            toggleBtn.title = 'Show password';
-        }
-        passwordInput.focus();
+    // Socket.IO connection
+    const socket = io({
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
     });
-}
 
-// NEW: Password validation setup
-function setupPasswordValidation() {
+    // DOM Elements
+    const loginSection = document.getElementById('loginSection');
+    const chatSection = document.getElementById('chatSection');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const showRegister = document.getElementById('show-register');
+    const showLogin = document.getElementById('show-login');
+    const loginBtn = document.getElementById('login-btn');
+    const registerBtn = document.getElementById('register-btn');
+    const errorMessage = document.getElementById('error-message');
+    const successMessage = document.getElementById('success-message');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatMessages = document.getElementById('chat-messages');
+    const emojiBtn = document.getElementById('emoji-btn');
+    const emojiPicker = document.getElementById('emoji-picker');
+
+    // Password toggle functionality
+    const passwordToggle = document.getElementById('password-toggle');
+    const registerPasswordToggle = document.getElementById('register-password-toggle');
+    const confirmPasswordToggle = document.getElementById('confirm-password-toggle');
+    const passwordInput = document.getElementById('password-input');
     const registerPassword = document.getElementById('register-password');
     const confirmPassword = document.getElementById('confirm-password');
 
-    if (registerPassword) {
-        registerPassword.addEventListener('input', function() {
-            checkPasswordStrength(this.value);
-            checkPasswordMatch();
-        });
-    }
-
-    if (confirmPassword) {
-        confirmPassword.addEventListener('input', checkPasswordMatch);
-    }
-}
-
-// NEW: Password strength checker
-function checkPasswordStrength(password) {
+    // Password strength elements
     const strengthBar = document.getElementById('register-strength-bar');
     const strengthText = document.getElementById('register-strength-text');
-    
-    if (!strengthBar || !strengthText) return;
+    const passwordMatch = document.getElementById('password-match-indicator');
 
-    let strength = 0;
-    let text = '';
-    let color = '';
+    // Connection status
+    let isConnected = false;
+    let currentUser = null;
 
-    // Reset
-    strengthBar.className = 'strength-bar';
-    strengthBar.style.width = '0%';
+    // Socket.IO Events
+    socket.on('connect', function() {
+        console.log('✅ Connected to server');
+        isConnected = true;
+        showConnectionStatus('Connected to chat', 'connected');
+    });
 
-    if (password.length === 0) {
-        strengthText.textContent = '';
-        return;
-    }
+    socket.on('disconnect', function() {
+        console.log('❌ Disconnected from server');
+        isConnected = false;
+        showConnectionStatus('Disconnected from chat', 'disconnected');
+    });
 
-    // Length check
-    if (password.length >= 8) strength++;
-    
-    // Contains numbers
-    if (/\d/.test(password)) strength++;
-    
-    // Contains special characters
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) strength++;
-    
-    // Contains uppercase and lowercase
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    socket.on('connected', function(data) {
+        console.log('Server:', data.message);
+    });
 
-    switch(strength) {
-        case 0:
-        case 1:
-            text = 'Weak';
-            color = 'strength-weak';
-            break;
-        case 2:
-        case 3:
-            text = 'Medium';
-            color = 'strength-medium';
-            break;
-        case 4:
-            text = 'Strong';
-            color = 'strength-strong';
-            break;
-    }
+    socket.on('join_success', function(data) {
+        console.log('✅ Join success:', data.message);
+        currentUser = { username: data.username };
+        showSuccessMessage(`Welcome ${data.username}!`);
+        switchToChat();
+        updateOnlineUsers();
+    });
 
-    strengthBar.className = 'strength-bar ' + color;
-    strengthText.textContent = text;
-    strengthText.style.color = getComputedStyle(document.documentElement).getPropertyValue('--' + color.split('-')[1]);
-}
+    socket.on('login_error', function(data) {
+        console.error('❌ Login error:', data.message);
+        showErrorMessage(data.message);
+        enableLoginButton();
+    });
 
-// NEW: Password match checker
-function checkPasswordMatch() {
-    const password = document.getElementById('register-password').value;
-    const confirmPassword = document.getElementById('confirm-password').value;
-    const matchIndicator = document.getElementById('password-match-indicator');
-    
-    if (!matchIndicator) return;
+    socket.on('new_message', function(data) {
+        console.log('📨 New message:', data);
+        displayMessage(data);
+    });
 
-    if (confirmPassword.length === 0) {
-        matchIndicator.className = 'password-match';
-        return;
-    }
+    socket.on('user_joined', function(data) {
+        console.log('👋 User joined:', data);
+        displaySystemMessage(`${data.username} joined the chat`, data.timestamp);
+        socket.emit('get_online_users');
+    });
 
-    if (password === confirmPassword && password.length > 0) {
-        matchIndicator.className = 'password-match visible valid';
-        matchIndicator.querySelector('.match-text').textContent = 'Passwords match';
-    } else {
-        matchIndicator.className = 'password-match visible invalid';
-        matchIndicator.querySelector('.match-text').textContent = 'Passwords do not match';
-    }
-}
+    socket.on('user_left', function(data) {
+        console.log('👋 User left:', data);
+        displaySystemMessage(`${data.username} left the chat`, data.timestamp);
+        socket.emit('get_online_users');
+    });
 
-function setupEnterKeySupport() {
-    // Login form
-    const loginEmail = document.getElementById('login-email');
-    const passwordInput = document.getElementById('password-input');
+    socket.on('online_users_update', function(data) {
+        console.log('👥 Online users update:', data.users);
+        updateOnlineUsersList(data.users);
+    });
 
-    if (loginEmail) {
-        loginEmail.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleLogin();
-        });
-    }
+    socket.on('error', function(data) {
+        console.error('❌ Error:', data.message);
+        showErrorMessage(data.message);
+    });
 
-    if (passwordInput) {
-        passwordInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleLogin();
-        });
-    }
+    // Form Toggle
+    showRegister.addEventListener('click', function(e) {
+        e.preventDefault();
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        clearMessages();
+    });
 
-    // Registration form
-    const registerUsername = document.getElementById('register-username');
-    const registerEmail = document.getElementById('register-email');
-    const registerPassword = document.getElementById('register-password');
-    const confirmPassword = document.getElementById('confirm-password');
+    showLogin.addEventListener('click', function(e) {
+        e.preventDefault();
+        registerForm.style.display = 'none';
+        loginForm.style.display = 'block';
+        clearMessages();
+    });
 
-    if (registerUsername) {
-        registerUsername.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleRegister();
-        });
-    }
+    // Login Handler
+    loginBtn.addEventListener('click', function() {
+        const email = document.getElementById('login-email').value.trim();
+        const password = passwordInput.value.trim();
 
-    if (registerEmail) {
-        registerEmail.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleRegister();
-        });
-    }
+        if (!email || !password) {
+            showErrorMessage('Please fill in all fields');
+            return;
+        }
 
-    if (registerPassword) {
-        registerPassword.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleRegister();
-        });
-    }
+        disableLoginButton();
+        clearMessages();
 
-    if (confirmPassword) {
-        confirmPassword.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') handleRegister();
-        });
-    }
-}
-
-function handleRegister() {
-    console.log('Register button clicked!');
-
-    // Get form values safely
-    const username = getValue('register-username');
-    const email = getValue('register-email');
-    const password = getValue('register-password');
-    const confirmPassword = getValue('confirm-password');
-
-    console.log('Form data:', { username, email, password, confirmPassword });
-
-    // Validation
-    if (!username || username.length < 2) {
-        showMessage('Username must be at least 2 characters', 'error');
-        return;
-    }
-
-    if (!email || !email.includes('@') || !email.includes('.')) {
-        showMessage('Please enter a valid email address', 'error');
-        return;
-    }
-
-    if (!password || password.length < 6) {
-        showMessage('Password must be at least 6 characters', 'error');
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        showMessage('Passwords do not match', 'error');
-        return;
-    }
-
-    // Show loading state
-    const btn = document.getElementById('register-btn');
-    if (btn) {
-        btn.textContent = 'Creating Account...';
-        btn.disabled = true;
-        btn.classList.add('btn-loading');
-    }
-
-    // Send registration request
-    fetch('/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                username: username,
-                email: email,
-                password: password
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Registration response:', data);
-            if (data.success) {
-                showMessage('Account created successfully! You can now login.', 'success');
-                // Switch to login form after delay
-                setTimeout(() => {
-                    document.getElementById('registerForm').style.display = 'none';
-                    document.getElementById('loginForm').style.display = 'block';
-                    // Pre-fill email
-                    const loginEmail = document.getElementById('login-email');
-                    if (loginEmail) loginEmail.value = email;
-                    clearMessages();
-                }, 2000);
-            } else {
-                showMessage(data.message || 'Registration failed', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Registration error:', error);
-            showMessage('Error connecting to server. Please try again.', 'error');
-        })
-        .finally(() => {
-            // Restore button
-            if (btn) {
-                btn.textContent = 'Create Account';
-                btn.disabled = false;
-                btn.classList.remove('btn-loading');
-            }
-        });
-}
-
-function handleLogin() {
-    const email = getValue('login-email');
-    const password = getValue('password-input');
-
-    if (!email || !password) {
-        showMessage('Please enter email and password', 'error');
-        return;
-    }
-
-    // Validate email format
-    if (!email.includes('@') || !email.includes('.')) {
-        showMessage('Please enter a valid email address', 'error');
-        return;
-    }
-
-    // Show loading state
-    const btn = document.getElementById('login-btn');
-    if (btn) {
-        btn.textContent = 'Logging in...';
-        btn.disabled = true;
-        btn.classList.add('btn-loading');
-    }
-
-    console.log('Attempting login with:', email);
-    
-    // Check socket connection first
-    if (!socket.connected) {
-        console.log('Socket not connected, attempting to connect...');
-        socket.connect();
-        
-        // Wait a moment for connection
-        setTimeout(() => {
-            if (socket.connected) {
-                socket.emit('join_chat', {
-                    email: email,
-                    password: password
-                });
-            } else {
-                showMessage('Connection failed. Please refresh the page.', 'error');
-                if (btn) {
-                    btn.textContent = 'Login to Chat';
-                    btn.disabled = false;
-                    btn.classList.remove('btn-loading');
-                }
-            }
-        }, 1000);
-    } else {
-        // Socket is already connected
+        console.log('🔐 Attempting login...');
         socket.emit('join_chat', {
             email: email,
             password: password
         });
+    });
+
+    // Register Handler
+    registerBtn.addEventListener('click', function() {
+        const username = document.getElementById('register-username').value.trim();
+        const email = document.getElementById('register-email').value.trim();
+        const password = registerPassword.value.trim();
+        const confirm = confirmPassword.value.trim();
+
+        if (!username || !email || !password || !confirm) {
+            showErrorMessage('Please fill in all fields');
+            return;
+        }
+
+        if (password !== confirm) {
+            showErrorMessage('Passwords do not match');
+            return;
+        }
+
+        if (password.length < 6) {
+            showErrorMessage('Password must be at least 6 characters long');
+            return;
+        }
+
+        disableRegisterButton();
+        clearMessages();
+
+        // Send registration request
+        fetch('/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessMessage('Account created successfully! Please login.');
+                    registerForm.style.display = 'none';
+                    loginForm.style.display = 'block';
+                    // Clear registration form
+                    document.getElementById('register-username').value = '';
+                    document.getElementById('register-email').value = '';
+                    registerPassword.value = '';
+                    confirmPassword.value = '';
+                } else {
+                    showErrorMessage(data.message);
+                }
+                enableRegisterButton();
+            })
+            .catch(error => {
+                console.error('Registration error:', error);
+                showErrorMessage('Registration failed. Please try again.');
+                enableRegisterButton();
+            });
+    });
+
+    // Send Message
+    sendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    function sendMessage() {
+        const message = messageInput.value.trim();
+        if (message && isConnected) {
+            socket.emit('send_message', {
+                message: message
+            });
+            messageInput.value = '';
+            hideEmojiPicker();
+        }
     }
-}
 
-function handleSendMessage() {
-    const messageInput = document.getElementById('message-input');
-    const message = messageInput ? messageInput.value.trim() : '';
+    // Password Toggle
+    [passwordToggle, registerPasswordToggle, confirmPasswordToggle].forEach((toggle, index) => {
+        toggle.addEventListener('click', function() {
+            const inputs = [passwordInput, registerPassword, confirmPassword];
+            const input = inputs[index];
+            const eyeIcon = toggle.querySelector('.eye-icon');
 
-    if (message && socket && socket.connected) {
-        socket.emit('send_message', { message: message });
-        messageInput.value = '';
-
-        // Hide emoji picker
-        const emojiPicker = document.getElementById('emoji-picker');
-        if (emojiPicker) emojiPicker.style.display = 'none';
-    } else if (message && (!socket || !socket.connected)) {
-        showMessage('Not connected to server', 'error');
-    }
-}
-
-function toggleEmojiPicker() {
-    const picker = document.getElementById('emoji-picker');
-    if (picker) {
-        picker.style.display = picker.style.display === 'block' ? 'none' : 'block';
-    }
-}
-
-// Setup emoji picker
-function setupEmojiPicker() {
-    const emojiGrid = document.querySelector('.emoji-grid');
-    if (!emojiGrid) return;
-
-    const emojiSpans = emojiGrid.querySelectorAll('span');
-
-    emojiSpans.forEach(span => {
-        span.addEventListener('click', function() {
-            const emoji = this.textContent;
-            const messageInput = document.getElementById('message-input');
-            if (messageInput) {
-                messageInput.value += emoji;
-                messageInput.focus();
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeIcon.textContent = '👁️‍🗨️';
+            } else {
+                input.type = 'password';
+                eyeIcon.textContent = '👁️';
             }
         });
     });
-}
 
-// Close emoji picker when clicking outside
-document.addEventListener('click', function(event) {
-    const picker = document.getElementById('emoji-picker');
-    const emojiBtn = document.getElementById('emoji-btn');
+    // Password Strength Check
+    registerPassword.addEventListener('input', checkPasswordStrength);
+    confirmPassword.addEventListener('input', checkPasswordMatch);
 
-    if (picker && emojiBtn && !picker.contains(event.target) && !emojiBtn.contains(event.target)) {
-        picker.style.display = 'none';
+    // Emoji Picker
+    emojiBtn.addEventListener('click', function() {
+        emojiPicker.style.display = emojiPicker.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Add emoji click handlers
+    emojiPicker.querySelectorAll('.emoji-grid span').forEach(emoji => {
+        emoji.addEventListener('click', function() {
+            messageInput.value += this.textContent;
+            messageInput.focus();
+        });
+    });
+
+    // Hide emoji picker when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) {
+            hideEmojiPicker();
+        }
+    });
+
+    // Message Display Functions
+    function displayMessage(data) {
+        const messageDiv = document.createElement('div');
+        const isOwnMessage = currentUser && data.username === currentUser.username;
+        messageDiv.className = `message ${isOwnMessage ? 'own-message' : ''}`;
+
+        const avatarColor = stringToColor(data.username);
+
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <div class="avatar" style="background-color: ${avatarColor}">
+                    ${data.username.charAt(0).toUpperCase()}
+                </div>
+                <span class="username">${data.username}${isOwnMessage ? ' (You)' : ''}</span>
+            </div>
+            <div class="text">${escapeHtml(data.message)}</div>
+            <div class="timestamp">${data.timestamp}</div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
-});
 
-// ===== SOCKET EVENT HANDLERS =====
-
-socket.on('connect', function() {
-    console.log('✅ Connected to server');
-    showMessage('Connected to server', 'success');
-    setTimeout(clearMessages, 3000);
-});
-
-socket.on('disconnect', function() {
-    console.log('❌ Disconnected from server');
-    showMessage('Disconnected from server', 'error');
-});
-
-socket.on('connect_error', function(error) {
-    console.log('❌ Connection error:', error);
-    showMessage('Connection failed. Please refresh the page.', 'error');
-});
-
-socket.on('join_success', function(data) {
-    console.log('✅ Login successful:', data);
-    const btn = document.getElementById('login-btn');
-    if (btn) {
-        btn.textContent = 'Login to Chat';
-        btn.disabled = false;
-        btn.classList.remove('btn-loading');
+    function displaySystemMessage(message, timestamp) {
+        const systemDiv = document.createElement('div');
+        systemDiv.className = 'system-message';
+        systemDiv.textContent = `${message} • ${timestamp}`;
+        chatMessages.appendChild(systemDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('chatSection').style.display = 'flex';
-
-    // Focus on message input
-    const messageInput = document.getElementById('message-input');
-    if (messageInput) messageInput.focus();
-    
-    showMessage('Login successful!', 'success');
-    setTimeout(clearMessages, 2000);
-});
-
-socket.on('error', function(data) {
-    console.log('❌ Socket error:', data);
-    const btn = document.getElementById('login-btn');
-    if (btn) {
-        btn.textContent = 'Login to Chat';
-        btn.disabled = false;
-        btn.classList.remove('btn-loading');
+    // Online Users Functions
+    function updateOnlineUsers() {
+        const onlineUsersPanel = document.getElementById('onlineUsersPanel');
+        onlineUsersPanel.style.display = 'block';
+        socket.emit('get_online_users');
     }
-    showMessage(data.message || 'Login failed', 'error');
-});
 
-socket.on('new_message', function(data) {
-    addMessage(data.username, data.message, data.timestamp, data.avatar_color);
-});
+    function updateOnlineUsersList(users) {
+        const usersList = document.getElementById('usersList');
 
-socket.on('user_joined', function(data) {
-    addSystemMessage(`${data.username} joined the chat`);
-});
+        if (!users || users.length === 0) {
+            usersList.innerHTML = '<div class="user-item">No users online</div>';
+            return;
+        }
 
-socket.on('user_left', function(data) {
-    addSystemMessage(`${data.username} left the chat`);
-});
+        let usersHTML = '';
+        users.forEach(user => {
+            const isCurrentUser = currentUser && user.username === currentUser.username;
+            const avatarColor = stringToColor(user.username);
+            usersHTML += `
+                <div class="user-item">
+                    <div class="user-avatar" style="background-color: ${avatarColor}">
+                        ${user.username.charAt(0).toUpperCase()}
+                    </div>
+                    <span class="username">${user.username}${isCurrentUser ? ' (You)' : ''}</span>
+                    <div class="online-status"></div>
+                </div>
+            `;
+        });
 
-// ===== HELPER FUNCTIONS =====
+        usersList.innerHTML = usersHTML;
+    }
 
-function getValue(elementId) {
-    const element = document.getElementById(elementId);
-    return element ? element.value.trim() : '';
-}
+    // Utility Functions
+    function switchToChat() {
+        loginSection.style.display = 'none';
+        chatSection.style.display = 'flex';
+        messageInput.focus();
+    }
 
-function showMessage(message, type) {
-    const errorDiv = document.getElementById('error-message');
-    const successDiv = document.getElementById('success-message');
+    function showErrorMessage(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+        successMessage.style.display = 'none';
+    }
 
-    if (type === 'error' && errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
-        if (successDiv) successDiv.style.display = 'none';
-        
-        // Auto-hide error after 5 seconds
+    function showSuccessMessage(message) {
+        successMessage.textContent = message;
+        successMessage.style.display = 'block';
+        errorMessage.style.display = 'none';
+    }
+
+    function clearMessages() {
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+    }
+
+    function disableLoginButton() {
+        loginBtn.disabled = true;
+        loginBtn.classList.add('btn-loading');
+        loginBtn.textContent = 'Connecting...';
+    }
+
+    function enableLoginButton() {
+        loginBtn.disabled = false;
+        loginBtn.classList.remove('btn-loading');
+        loginBtn.textContent = 'Login to Chat';
+    }
+
+    function disableRegisterButton() {
+        registerBtn.disabled = true;
+        registerBtn.classList.add('btn-loading');
+        registerBtn.textContent = 'Creating Account...';
+    }
+
+    function enableRegisterButton() {
+        registerBtn.disabled = false;
+        registerBtn.classList.remove('btn-loading');
+        registerBtn.textContent = 'Create Account';
+    }
+
+    function checkPasswordStrength() {
+        const password = registerPassword.value;
+        let strength = 0;
+        let text = '';
+        let className = '';
+
+        if (password.length > 0) {
+            if (password.length < 6) {
+                strength = 1;
+                text = 'Weak';
+                className = 'weak';
+            } else if (password.length < 10) {
+                strength = 2;
+                text = 'Medium';
+                className = 'medium';
+            } else {
+                strength = 3;
+                text = 'Strong';
+                className = 'strong';
+            }
+
+            // Check for special characters
+            if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                strength = Math.min(strength + 1, 3);
+            }
+        }
+
+        strengthBar.className = 'strength-bar';
+        if (strength > 0) {
+            strengthBar.classList.add(`strength-${className}`);
+            strengthText.textContent = text;
+            strengthText.className = `password-strength-text ${className}`;
+        } else {
+            strengthText.textContent = '';
+        }
+    }
+
+    function checkPasswordMatch() {
+        const password = registerPassword.value;
+        const confirm = confirmPassword.value;
+
+        if (confirm.length === 0) {
+            passwordMatch.classList.remove('visible', 'valid', 'invalid');
+            return;
+        }
+
+        passwordMatch.classList.add('visible');
+
+        if (password === confirm && password.length > 0) {
+            passwordMatch.classList.add('valid');
+            passwordMatch.classList.remove('invalid');
+        } else {
+            passwordMatch.classList.add('invalid');
+            passwordMatch.classList.remove('valid');
+        }
+    }
+
+    function hideEmojiPicker() {
+        emojiPicker.style.display = 'none';
+    }
+
+    function showConnectionStatus(message, type) {
+        // Remove existing status
+        const existingStatus = document.querySelector('.connection-status');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+
+        const statusDiv = document.createElement('div');
+        statusDiv.className = `connection-status ${type}`;
+        statusDiv.innerHTML = `
+            <span class="status-dot ${type}"></span>
+            ${message}
+        `;
+
+        document.body.appendChild(statusDiv);
+
+        // Auto-remove after 3 seconds
         setTimeout(() => {
-            errorDiv.style.display = 'none';
-        }, 5000);
-    } else if (type === 'success' && successDiv) {
-        successDiv.textContent = message;
-        successDiv.style.display = 'block';
-        if (errorDiv) errorDiv.style.display = 'none';
-        
-        // Auto-hide success after 3 seconds
-        setTimeout(() => {
-            successDiv.style.display = 'none';
+            if (statusDiv.parentNode) {
+                statusDiv.remove();
+            }
         }, 3000);
     }
-}
 
-function clearMessages() {
-    const errorDiv = document.getElementById('error-message');
-    const successDiv = document.getElementById('success-message');
-    if (errorDiv) errorDiv.style.display = 'none';
-    if (successDiv) successDiv.style.display = 'none';
-}
+    function stringToColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const hue = hash % 360;
+        return `hsl(${hue}, 70%, 60%)`;
+    }
 
-function addMessage(username, message, timestamp = 'Just now', avatarColor = '#666666') {
-    const chatMessages = document.getElementById('chat-messages');
-    if (!chatMessages) return;
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'message';
-
-    const userInitial = username.charAt(0).toUpperCase();
-
-    messageDiv.innerHTML = `
-        <div class="message-header">
-            <div class="avatar" style="background: ${avatarColor}">${userInitial}</div>
-            <span class="username">${username}</span>
-            <span class="timestamp">${timestamp}</span>
-        </div>
-        <div class="text">${message}</div>
-    `;
-
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function addSystemMessage(message) {
-    const chatMessages = document.getElementById('chat-messages');
-    if (!chatMessages) return;
-
-    const systemDiv = document.createElement('div');
-    systemDiv.className = 'system-message';
-    systemDiv.textContent = message;
-
-    chatMessages.appendChild(systemDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-// Export for testing (if needed)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        handleLogin,
-        handleRegister,
-        handleSendMessage,
-        addMessage,
-        addSystemMessage
-    };
-}
-
-console.log('✅ ChatMate JavaScript loaded safely!');
+    // Initialize
+    console.log('🚀 ChatMate initialized');
+});
