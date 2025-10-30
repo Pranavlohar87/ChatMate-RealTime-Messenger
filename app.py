@@ -13,12 +13,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize extensions
 db = SQLAlchemy(app)
 
-# Socket.io configuration
-socketio = SocketIO(app, 
-                   cors_allowed_origins="*",
-                   async_mode='eventlet',
-                   logger=True,
-                   engineio_logger=False)
+# SIMPLE Socket.io configuration - Remove eventlet
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Database Models
 class User(db.Model):
@@ -176,6 +172,5 @@ def health():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
-    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     print(f'🚀 Starting ChatMate server on port {port}')
-    socketio.run(app, host='0.0.0.0', port=port, debug=debug, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=port)
